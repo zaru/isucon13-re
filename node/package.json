@@ -2,7 +2,7 @@
   "name": "isupipe",
   "version": "1.0.0",
   "scripts": {
-    "start": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
     "format": "prettier -w src",
     "lint": "eslint --fix src"
   },
