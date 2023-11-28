@@ -186,7 +186,7 @@ export const registerHandler = async (
         'u.isucon.dev',
         body.name,
         'A',
-        '0',
+        '86400',
         c.get('runtime').powerDNSSubdomainAddress,
       ])
       .catch(throwErrorWith('failed to add record to powerdns'))
