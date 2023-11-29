@@ -88,15 +88,12 @@ export const getUserStatisticsHandler = [
       }
 
       // リアクション数
-      const [[{ 'COUNT(*)': totalReactions }]] = await conn
-        .query<({ 'COUNT(*)': number } & RowDataPacket)[]>(
+      const [[{ 'total_reactions': totalReactions }]] = await conn
+        .query<({ 'total_reactions': number } & RowDataPacket)[]>(
           `
-            SELECT COUNT(*) FROM users u 
-            INNER JOIN livestreams l ON l.user_id = u.id 
-            INNER JOIN reactions r ON r.livestream_id = l.id
-            WHERE u.name = ?
+            select total_reactions from users where id = ?
           `,
-          [username],
+          [user.id],
         )
         .catch(throwErrorWith('failed to count reactions'))
 
