@@ -8,8 +8,11 @@ import {
   fillReactionResponse,
 } from '../utils/fill-reaction-response'
 import { throwErrorWith } from '../utils/throw-error-with'
-import { ReactionsModel } from '../types/models'
+import { LivestreamsModel } from '../types/models'
 import { atoi } from '../utils/integer'
+import {
+  fillLivestreamResponse,
+} from '../utils/fill-livestream-response'
 
 // GET /api/livestream/:livestream_id/reaction
 export const getReactionsHandler = [
@@ -22,12 +25,62 @@ export const getReactionsHandler = [
       return c.text('livestream_id in path must be integer', 400)
     }
 
+    interface ReactionsRelModel {
+      id: number
+      livestream_id: number
+      emoji_name: string
+      created_at: number
+
+      user_id: number
+      user_name: string
+      user_display_name: string
+      user_description: string
+      
+      icon_id?: number
+      icon_image_hash?: string
+
+      theme_id: number
+      theme_dark_mode: boolean
+    }
+
     const conn = await c.get('pool').getConnection()
     await conn.beginTransaction()
 
     try {
+      const [[livestream]] = await conn.query<(LivestreamsModel & RowDataPacket)[]>(
+        'SELECT * FROM livestreams WHERE id = ?',
+        [livestreamId],
+      )
+      if (!livestream) throw new Error(`not found livestream that has the given id`)
+    
+      const livestreamResponse = await fillLivestreamResponse(
+        conn,
+        livestream,
+        c.get('runtime').fallbackUserIcon,
+      )
+
       let query =
-        'SELECT * FROM reactions WHERE livestream_id = ? ORDER BY created_at DESC'
+        `SELECT
+        reactions.id,
+        reactions.user_id,
+        reactions.livestream_id,
+        reactions.emoji_name,
+        reactions.created_at,
+  
+        users.name as user_name,
+        users.display_name as user_display_name,
+        users.description as user_description,
+        
+        icons.id as icon_id,
+        icons.image_hash as icon_image_hash,
+
+        themes.id as theme_id,
+        themes.dark_mode as theme_dark_mode
+        FROM reactions
+          inner join users on users.id = reactions.user_id
+          left outer join icons on users.id = icons.user_id
+          inner join themes on users.id = themes.user_id
+          WHERE reactions.livestream_id = ? ORDER BY reactions.created_at DESC`
       const limit = c.req.query('limit')
       if (limit) {
         const limitNumber = atoi(limit)
@@ -38,16 +91,29 @@ export const getReactionsHandler = [
       }
 
       const [reactions] = await conn
-        .query<(ReactionsModel & RowDataPacket)[]>(query, [livestreamId])
+        .query<(ReactionsRelModel & RowDataPacket)[]>(query, [livestreamId])
         .catch(throwErrorWith('failed to get reactions'))
 
       const reactionResponses: ReactionResponse[] = []
       for (const reaction of reactions) {
-        const reactionResponse = await fillReactionResponse(
-          conn,
-          reaction,
-          c.get('runtime').fallbackUserIcon,
-        ).catch(throwErrorWith('failed to fill reaction'))
+        const userResponse = {
+          id: reaction.user_id,
+          name: reaction.user_name,
+          display_name: reaction.user_display_name,
+          description: reaction.user_description,
+          theme: {
+            id: reaction.theme_id,
+            dark_mode: !!reaction.theme_dark_mode,
+          },
+          icon_hash: reaction.icon_image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
+        };
+        const reactionResponse = {
+          id: reaction.id,
+          emoji_name: reaction.emoji_name,
+          user: userResponse,
+          livestream:  livestreamResponse,
+          created_at: reaction.created_at,
+        }
 
         reactionResponses.push(reactionResponse)
       }
