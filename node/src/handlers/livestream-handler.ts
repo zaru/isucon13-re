@@ -21,6 +21,7 @@ import {
 } from '../types/models'
 import { throwErrorWith } from '../utils/throw-error-with'
 import { atoi } from '../utils/integer'
+import { tagMaster } from '../utils/tags'
 
 // POST /api/livestream/reservation
 export const reserveLivestreamHandler = [
@@ -160,17 +161,11 @@ export const searchLivestreamsHandler = async (
 
     if (keyTagName) {
       // タグによる取得
-      const [tagIds] = await conn
-        .query<(Pick<TagsModel, 'id'> & RowDataPacket)[]>(
-          'SELECT id FROM tags WHERE name = ?',
-          [keyTagName],
-        )
-        .catch(throwErrorWith('failed to get tag'))
-
+      const tagIds = [tagMaster().findIndex(tag => tag === keyTagName) + 1];
       const [livestreamTags] = await conn
         .query<(LivestreamTagsModel & RowDataPacket)[]>(
           'SELECT * FROM livestream_tags WHERE tag_id IN (?) ORDER BY livestream_id DESC',
-          [tagIds.map((tag) => tag.id)],
+          [tagIds],
         )
         .catch(throwErrorWith('failed to get keyTaggedLivestreams'))
 

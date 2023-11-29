@@ -6,6 +6,7 @@ import {
   UserModel,
 } from '../types/models'
 import { UserResponse, fillUserResponse } from './fill-user-response'
+import { tagMaster } from '../utils/tags'
 
 export interface LivestreamResponse {
   id: number
@@ -38,11 +39,10 @@ export const fillLivestreamResponse = async (
 
   const tags: TagsModel[] = []
   for (const livestreamTag of livestreamTags) {
-    const [[tag]] = await conn.query<(TagsModel & RowDataPacket)[]>(
-      'SELECT * FROM tags WHERE id = ?',
-      [livestreamTag.tag_id],
-    )
-    tags.push(tag)
+    tags.push({
+      id: livestreamTag.tag_id,
+      name: tagMaster()[livestreamTag.tag_id - 1]
+    })
   }
 
   return {
