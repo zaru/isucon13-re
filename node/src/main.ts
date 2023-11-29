@@ -48,6 +48,8 @@ import {
   postIconHandler,
 } from './handlers/user-handler'
 
+let fallbackUserIcon: Readonly<ArrayBuffer>|null = null;
+
 const runtime = {
   exec: async (cmd: string[]) =>
     new Promise((resolve, reject) => {
@@ -69,16 +71,21 @@ const runtime = {
   hashPassword: async (password: string) => hash(password, 4),
   comparePassword: async (password: string, hash: string) =>
     compare(password, hash),
-  fallbackUserIcon: () =>
+  fallbackUserIcon: () => {
+    if (fallbackUserIcon) {
+      return Promise.resolve(fallbackUserIcon);
+    }
     // eslint-disable-next-line unicorn/prefer-module, unicorn/prefer-top-level-await
-    readFile(join(__dirname, '../../img/NoImage.jpg')).then((v) => {
+    return readFile(join(__dirname, '../../img/NoImage.jpg')).then((v) => {
       const buf = v.buffer
       if (buf instanceof ArrayBuffer) {
+        fallbackUserIcon = buf;
         return buf
       } else {
         throw new TypeError(`NoImage.jpg should be ArrayBuffer, but ${buf}`)
       }
-    }),
+    })
+  },
 } satisfies Runtime
 
 const pool = createPool({
