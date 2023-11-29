@@ -196,7 +196,7 @@ export const postLivecommentHandler = [
     const body = await c.req.json<{ comment: string; tip: number }>()
 
     const conn = await c.get('pool').getConnection()
-    await conn.beginTransaction()
+    // await conn.beginTransaction()
     try {
       const [[livestream]] = await conn
         .execute<(LivestreamsModel & RowDataPacket)[]>(
@@ -247,6 +247,7 @@ export const postLivecommentHandler = [
           [body.tip, body.tip, livestreamId],
         )
         .catch(throwErrorWith('failed to insert reaction'))
+// TOOD: 500error deadlockがでるのでざつにトランザクションを外している。いちおう今のところは問題ないが…
       await conn
         .query<ResultSetHeader>(
           `
@@ -275,7 +276,7 @@ export const postLivecommentHandler = [
         c.get('runtime').fallbackUserIcon,
       ).catch(throwErrorWith('failed to fill livecomment'))
 
-      await conn.commit().catch(throwErrorWith('failed to commit'))
+      // await conn.commit().catch(throwErrorWith('failed to commit'))
 
       return c.json(livecommentResponse, 201)
     } catch (error) {
