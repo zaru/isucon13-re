@@ -137,83 +137,44 @@ export const getLivestreamStatisticsHandler = [
         return c.json('cannot get stats of not found livestream', 404)
       }
 
-      const [livestreams] = await conn
-        .query<(LivestreamsModel & RowDataPacket)[]>(
-          'SELECT * FROM livestreams',
-        )
-        .catch(throwErrorWith('failed to get livestreams'))
-
       // ランク算出
-      const ranking: {
-        livestreamId: number
-        title: string
-        score: number
-      }[] = []
-      for (const livestream of livestreams) {
-        const [[{ 'COUNT(*)': reactionCount }]] = await conn
-          .query<({ 'COUNT(*)': number } & RowDataPacket)[]>(
-            'SELECT COUNT(*) FROM livestreams l INNER JOIN reactions r ON l.id = r.livestream_id WHERE l.id = ?',
-            [livestream.id],
-          )
-          .catch(throwErrorWith('failed to count reactions'))
-
-        const [[{ 'IFNULL(SUM(l2.tip), 0)': totalTip }]] = await conn
-          .query<
-            ({ 'IFNULL(SUM(l2.tip), 0)': number | string } & RowDataPacket)[]
-          >(
-            'SELECT IFNULL(SUM(l2.tip), 0) FROM livestreams l INNER JOIN livecomments l2 ON l.id = l2.livestream_id WHERE l.id = ?',
-            [livestream.id],
-          )
-          .catch(throwErrorWith('failed to count tips'))
-
-        ranking.push({
-          livestreamId: livestream.id,
-          title: livestream.title,
-          score: reactionCount + Number(totalTip),
-        })
-      }
-      ranking.sort((a, b) => {
-        if (a.score === b.score) return a.livestreamId - b.livestreamId
-        return a.score - b.score
-      })
-
-      let rank = 1
-      for (const r of ranking.toReversed()) {
-        if (r.livestreamId === livestreamId) break
-        rank++
-      }
-
-      // 視聴者数算出
-      const [[{ 'COUNT(*)': viewersCount }]] = await conn
-        .query<({ 'COUNT(*)': number } & RowDataPacket)[]>(
-          'SELECT COUNT(*) FROM livestreams l INNER JOIN livestream_viewers_history h ON h.livestream_id = l.id WHERE l.id = ?',
-          [livestreamId],
-        )
-        .catch(throwErrorWith('failed to count viewers'))
-
-      // 最大チップ額
-      const [[{ 'IFNULL(MAX(tip), 0)': maxTip }]] = await conn
-        .query<({ 'IFNULL(MAX(tip), 0)': number } & RowDataPacket)[]>(
-          'SELECT IFNULL(MAX(tip), 0) FROM livestreams l INNER JOIN livecomments l2 ON l2.livestream_id = l.id WHERE l.id = ?',
-          [livestreamId],
-        )
-        .catch(throwErrorWith('failed to get max tip'))
-
-      // リアクション数
-      const [[{ 'COUNT(*)': totalReactions }]] = await conn
-        .query<({ 'COUNT(*)': number } & RowDataPacket)[]>(
-          'SELECT COUNT(*) FROM livestreams l INNER JOIN reactions r ON r.livestream_id = l.id WHERE l.id = ?',
-          [livestreamId],
+      const [[{
+        'score_rank': rank,
+      }]] = await conn
+        .query<({
+          'score_rank': number,
+        } & RowDataPacket)[]>(
+          `
+          select score_rank from (
+            SELECT
+              id,
+              RANK() OVER (ORDER BY score DESC, id DESC) AS score_rank
+            FROM livestreams) as livestreams
+            where id = ?
+          `,
+          [livestream.id],
         )
         .catch(throwErrorWith('failed to count reactions'))
 
-      // スパム報告数
-      const [[{ 'COUNT(*)': totalReports }]] = await conn
-        .query<({ 'COUNT(*)': number } & RowDataPacket)[]>(
-          'SELECT COUNT(*) FROM livestreams l INNER JOIN livecomment_reports r ON r.livestream_id = l.id WHERE l.id = ?',
-          [livestreamId],
+      // リアクション数、ライブコメント数、チップ合計
+      const [[{
+        'total_reactions': totalReactions,
+        'total_reports': totalReports,
+        'max_tip': maxTip,
+        'viewers_count': viewersCount,
+      }]] = await conn
+        .query<({
+          'total_reactions': number,
+          'total_reports': number,
+          'max_tip': number,
+          'viewers_count': number,
+        } & RowDataPacket)[]>(
+          `
+            select total_reactions, total_reports, max_tip, viewers_count from livestreams where id = ?
+          `,
+          [livestream.id],
         )
-        .catch(throwErrorWith('failed to count reports'))
+        .catch(throwErrorWith('failed to count reactions'))
 
       await conn.commit().catch(throwErrorWith('failed to commit'))
 

@@ -1031,3 +1031,9 @@ UPDATE users
                          INNER JOIN livestreams ON livestreams.id = livestream_viewers_history.livestream_id
                 GROUP BY livestreams.user_id) AS agg ON agg.user_id = users.id
 SET users.viewers_count = agg.num;
+
+UPDATE livestreams
+    INNER JOIN (SELECT livestream_id, COUNT(*) AS num
+                FROM reactions
+                GROUP BY livestream_id) AS agg ON agg.livestream_id = livestreams.id
+SET livestreams.total_reactions = agg.num, livestreams.score = agg.num;

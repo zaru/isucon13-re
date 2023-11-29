@@ -163,7 +163,14 @@ export const postReactionHandler = [
           [livestreamId],
         )
         .catch(throwErrorWith('failed to insert reaction'))
-        const reactionResponse = await fillReactionResponse(
+      await conn
+        .query<ResultSetHeader>(
+          'update livestreams set total_reactions = total_reactions + 1, score = score + 1 where id = ?',
+          [livestreamId],
+        )
+        .catch(throwErrorWith('failed to insert reaction'))
+
+      const reactionResponse = await fillReactionResponse(
         conn,
         {
           id: reactionId,
