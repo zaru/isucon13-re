@@ -35,8 +35,8 @@ export const getIconHandler = [
       }
 
       const [[icon]] = await conn
-        .query<(Pick<IconModel, 'image' | 'image_hash'> & RowDataPacket)[]>(
-          'SELECT image, image_hash FROM icons WHERE user_id = ?',
+        .query<(Pick<IconModel, 'image_hash'> & RowDataPacket)[]>(
+          'SELECT image_hash FROM icons WHERE user_id = ?',
           [user.id],
         )
         .catch(throwErrorWith('failed to get icon'))
@@ -46,16 +46,23 @@ export const getIconHandler = [
           'Content-Type': 'image/jpeg',
         })
       }
-
-      await conn.commit().catch(throwErrorWith('failed to commit'))
-
+      
       const reqHash = c.req.header('If-None-Match');
 
       if (reqHash === `"${icon.image_hash}"`) {
         return c.body(null, 304);
       }
 
-      return c.body(icon.image, 200, {
+      const [[icon2]] = await conn
+        .query<(Pick<IconModel, 'image'> & RowDataPacket)[]>(
+          'SELECT image FROM icons WHERE user_id = ?',
+          [user.id],
+        )
+        .catch(throwErrorWith('failed to get icon'))
+
+      await conn.commit().catch(throwErrorWith('failed to commit'))
+
+      return c.body(icon2.image, 200, {
         'Content-Type': 'image/jpeg',
       })
     } catch (error) {
