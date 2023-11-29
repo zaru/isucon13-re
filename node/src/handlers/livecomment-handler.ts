@@ -15,6 +15,9 @@ import {
 } from '../types/models'
 import { throwErrorWith } from '../utils/throw-error-with'
 import { atoi } from '../utils/integer'
+import {
+  fillLivestreamResponse,
+} from '../utils/fill-livestream-response'
 
 // GET /api/livestream/:livestream_id/livecomment
 export const getLivecommentsHandler = [
@@ -27,12 +30,65 @@ export const getLivecommentsHandler = [
       return c.text('livestream_id in path must be integer', 400)
     }
 
+    interface LivecommentRelModel {
+      id: number
+      comment: string
+      tip: number
+      created_at: number
+
+      user_id: number
+      user_name: string
+      user_display_name: string
+      user_description: string
+      
+      icon_id?: number
+      icon_image_hash?: string
+
+      theme_id: number
+      theme_dark_mode: boolean
+    }
+
     const conn = await c.get('pool').getConnection()
     await conn.beginTransaction()
 
     try {
+
+      const [[livestream]] = await conn.query<(LivestreamsModel & RowDataPacket)[]>(
+        'SELECT * FROM livestreams WHERE id = ?',
+        [livestreamId],
+      )
+      if (!livestream) throw new Error(`not found livestream that has the given id`)
+    
+      const livestreamResponse = await fillLivestreamResponse(
+        conn,
+        livestream,
+        c.get('runtime').fallbackUserIcon,
+      )
+
       let query =
-        'SELECT * FROM livecomments WHERE livestream_id = ? ORDER BY created_at DESC'
+        `
+        select
+          livecomments.id,
+          livecomments.user_id,
+          livecomments.comment,
+          livecomments.tip,
+          livecomments.created_at,
+
+          users.name as user_name,
+          users.display_name as user_display_name,
+          users.description as user_description,
+          
+          icons.id as icon_id,
+          icons.image_hash as icon_image_hash,
+
+          themes.id as theme_id,
+          themes.dark_mode as theme_dark_mode
+        from livecomments
+        inner join users on livecomments.user_id = users.id
+        left outer join icons on users.id = icons.user_id
+        inner join themes on users.id = themes.user_id
+        WHERE livecomments.livestream_id = ? ORDER BY livecomments.created_at DESC
+        `
       const limit = c.req.query('limit')
       if (limit) {
         const limitNumber = atoi(limit)
@@ -42,16 +98,30 @@ export const getLivecommentsHandler = [
         query += ` LIMIT ${limitNumber}`
       }
       const [livecomments] = await conn
-        .query<(LivecommentsModel & RowDataPacket)[]>(query, [livestreamId])
+        .query<(LivecommentRelModel & RowDataPacket)[]>(query, [livestreamId])
         .catch(throwErrorWith('failed to get livecomments'))
 
       const livecommnetResponses: LivecommentResponse[] = []
       for (const livecomment of livecomments) {
-        const livecommentResponse = await fillLivecommentResponse(
-          conn,
-          livecomment,
-          c.get('runtime').fallbackUserIcon,
-        ).catch(throwErrorWith('failed to fill livecomment'))
+        const userResponse = {
+          id: livecomment.user_id,
+          name: livecomment.user_name,
+          display_name: livecomment.user_display_name,
+          description: livecomment.user_description,
+          theme: {
+            id: livecomment.theme_id,
+            dark_mode: !!livecomment.theme_dark_mode,
+          },
+          icon_hash: livecomment.icon_image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
+        };
+        const livecommentResponse = {
+          id: livecomment.id,
+          user: userResponse,
+          livestream: livestreamResponse,
+          comment: livecomment.comment,
+          tip: livecomment.tip,
+          created_at: livecomment.created_at,
+        } satisfies LivecommentResponse
         livecommnetResponses.push(livecommentResponse)
       }
 
