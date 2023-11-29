@@ -10,6 +10,7 @@ export interface IconModel {
   id: number
   user_id: number
   image: ArrayBuffer
+  image_hash: string
 }
 
 export interface ThemeModel {

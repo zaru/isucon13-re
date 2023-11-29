@@ -10,6 +10,8 @@ import { verifyUserSessionMiddleware } from '../middlewares/verify-user-session-
 import { fillUserResponse } from '../utils/fill-user-response'
 import { throwErrorWith } from '../utils/throw-error-with'
 import { IconModel, UserModel } from '../types/models'
+import crypto from 'crypto'
+
 
 // GET /api/user/:username/icon
 export const getIconHandler = [
@@ -33,8 +35,8 @@ export const getIconHandler = [
       }
 
       const [[icon]] = await conn
-        .query<(Pick<IconModel, 'image'> & RowDataPacket)[]>(
-          'SELECT image FROM icons WHERE user_id = ?',
+        .query<(Pick<IconModel, 'image' | 'image_hash'> & RowDataPacket)[]>(
+          'SELECT image, image_hash FROM icons WHERE user_id = ?',
           [user.id],
         )
         .catch(throwErrorWith('failed to get icon'))
@@ -46,6 +48,12 @@ export const getIconHandler = [
       }
 
       await conn.commit().catch(throwErrorWith('failed to commit'))
+
+      const reqHash = c.req.header('If-None-Match');
+
+      if (reqHash === `"${icon.image_hash}"`) {
+        return c.body(null, 304);
+      }
 
       return c.body(icon.image, 200, {
         'Content-Type': 'image/jpeg',
@@ -77,10 +85,12 @@ export const postIconHandler = [
         .execute('DELETE FROM icons WHERE user_id = ?', [userId])
         .catch(throwErrorWith('failed to delete old user icon'))
 
+      const buffer = Buffer.from(body.image, 'base64');
+      const hash = crypto.createHash('sha256').update(buffer).digest('hex');
       const [{ insertId: iconId }] = await conn
         .query<ResultSetHeader>(
-          'INSERT INTO icons (user_id, image) VALUES (?, ?)',
-          [userId, Buffer.from(body.image, 'base64')],
+          'INSERT INTO icons (user_id, image, image_hash) VALUES (?, ?, ?)',
+          [userId, buffer, hash],
         )
         .catch(throwErrorWith('failed to insert icon'))
 
