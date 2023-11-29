@@ -188,12 +188,13 @@ export const registerHandler = async (
       )
       .catch(throwErrorWith('failed to insert user'))
 
-    await conn
+    const resThemeInsert = await conn
       .execute('INSERT INTO themes (user_id, dark_mode) VALUES(?, ?)', [
         userId,
         body.theme.dark_mode,
       ])
       .catch(throwErrorWith('failed to insert user theme'))
+    const themeId = resThemeInsert[0].insertId;
 
     await c
       .get('runtime')
@@ -208,16 +209,17 @@ export const registerHandler = async (
       ])
       .catch(throwErrorWith('failed to add record to powerdns'))
 
-    const response = await fillUserResponse(
-      conn,
-      {
-        id: userId,
-        name: body.name,
-        display_name: body.display_name,
-        description: body.description,
+    const response = {
+      id: userId,
+      name: body.name,
+      display_name: body.display_name,
+      description: body.description,
+      theme: {
+        id: themeId,
+        dark_mode: !!body.theme.dark_mode,
       },
-      c.get('runtime').fallbackUserIcon,
-    ).catch(throwErrorWith('failed to fill user'))
+      icon_hash: 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
+    };
 
     await conn.commit().catch(throwErrorWith('failed to commit'))
 
