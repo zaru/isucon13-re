@@ -92,38 +92,20 @@ export const getUserStatisticsHandler = [
         'total_reactions': totalReactions,
         'total_livecomments': totalLivecomments,
         'total_tip': totalTip,
+        'viewers_count': viewersCount,
       }]] = await conn
         .query<({
           'total_reactions': number,
           'total_livecomments': number,
           'total_tip': number,
+          'viewers_count': number,
         } & RowDataPacket)[]>(
           `
-            select total_reactions, total_livecomments, total_tip from users where id = ?
+            select total_reactions, total_livecomments, total_tip, viewers_count from users where id = ?
           `,
           [user.id],
         )
         .catch(throwErrorWith('failed to count reactions'))
-
-      const [livestreams] = await conn
-        .query<(LivestreamsModel & RowDataPacket)[]>(
-          `SELECT * FROM livestreams WHERE user_id = ?`,
-          [user.id],
-        )
-        .catch(throwErrorWith('failed to get livestreams'))
-
-      // 合計視聴者数
-      let viewersCount = 0
-      for (const livestream of livestreams) {
-        const [[{ 'COUNT(*)': livestreamViewerCount }]] = await conn
-          .query<({ 'COUNT(*)': number } & RowDataPacket)[]>(
-            `SELECT COUNT(*) FROM livestream_viewers_history WHERE livestream_id = ?`,
-            [livestream.id],
-          )
-          .catch(throwErrorWith('failed to get livestream_view_history'))
-
-        viewersCount += livestreamViewerCount
-      }
 
       // お気に入り絵文字
       const [[favoriteEmoji]] = await conn

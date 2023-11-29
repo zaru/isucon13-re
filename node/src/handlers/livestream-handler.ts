@@ -341,6 +341,13 @@ export const enterLivestreamHandler = [
         )
         .catch(throwErrorWith('failed to insert livestream_view_history'))
 
+      await conn
+        .query<ResultSetHeader>(
+          'update users set viewers_count = viewers_count + 1 where id = (select user_id from livestreams where id = ?)',
+          [livestreamId],
+        )
+        .catch(throwErrorWith('failed to insert reaction'))
+
       await conn.commit().catch(throwErrorWith('failed to commit'))
 
       // eslint-disable-next-line unicorn/no-null
@@ -377,6 +384,13 @@ export const exitLivestreamHandler = [
           [userId, livestreamId],
         )
         .catch(throwErrorWith('failed to delete livestream_view_history'))
+
+      await conn
+        .query<ResultSetHeader>(
+          'update users set viewers_count = viewers_count - 1 where id = (select user_id from livestreams where id = ?)',
+          [livestreamId],
+        )
+        .catch(throwErrorWith('failed to insert reaction'))
 
       await conn.commit().catch(throwErrorWith('failed to commit'))
 
