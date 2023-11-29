@@ -25,14 +25,10 @@ export const fillUserResponse = async (
   )
 
   const [[icon]] = await conn.query<
-    (Pick<IconModel, 'image'> & RowDataPacket)[]
-  >('SELECT image FROM icons WHERE user_id = ?', [user.id])
+    (Pick<IconModel, 'image_hash'> & RowDataPacket)[]
+  >('SELECT image_hash FROM icons WHERE user_id = ?', [user.id])
 
-  let image = icon?.image
-
-  if (!image) {
-    image = await getFallbackUserIcon()
-  }
+  const imageHash = icon?.image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0'
 
   return {
     id: user.id,
@@ -43,6 +39,6 @@ export const fillUserResponse = async (
       id: theme.id,
       dark_mode: !!theme.dark_mode,
     },
-    icon_hash: createHash('sha256').update(new Uint8Array(image)).digest('hex'),
+    icon_hash: imageHash,
   } satisfies UserResponse
 }
