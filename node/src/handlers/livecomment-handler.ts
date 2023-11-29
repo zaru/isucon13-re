@@ -164,6 +164,20 @@ export const postLivecommentHandler = [
         )
         .catch(throwErrorWith('failed to insert livecomment'))
 
+      await conn
+        .query<ResultSetHeader>(
+          'update users set total_livecomments = total_livecomments + 1 where id = (select user_id from livestreams where id = ?)',
+          [livestreamId],
+        )
+        .catch(throwErrorWith('failed to insert reaction'))
+      
+      await conn
+        .query<ResultSetHeader>(
+          'update users set total_tip = total_tip + ? where id = (select user_id from livestreams where id = ?)',
+          [body.tip, livestreamId],
+        )
+        .catch(throwErrorWith('failed to insert reaction'))
+
       const livecommentResponse = await fillLivecommentResponse(
         conn,
         {

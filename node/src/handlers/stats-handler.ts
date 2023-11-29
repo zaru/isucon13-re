@@ -87,39 +87,30 @@ export const getUserStatisticsHandler = [
         rank++
       }
 
-      // リアクション数
-      const [[{ 'total_reactions': totalReactions }]] = await conn
-        .query<({ 'total_reactions': number } & RowDataPacket)[]>(
+      // リアクション数、ライブコメント数、チップ合計
+      const [[{
+        'total_reactions': totalReactions,
+        'total_livecomments': totalLivecomments,
+        'total_tip': totalTip,
+      }]] = await conn
+        .query<({
+          'total_reactions': number,
+          'total_livecomments': number,
+          'total_tip': number,
+        } & RowDataPacket)[]>(
           `
-            select total_reactions from users where id = ?
+            select total_reactions, total_livecomments, total_tip from users where id = ?
           `,
           [user.id],
         )
         .catch(throwErrorWith('failed to count reactions'))
 
-      // ライブコメント数、チップ合計
-      let totalLivecomments = 0
-      let totalTip = 0
       const [livestreams] = await conn
         .query<(LivestreamsModel & RowDataPacket)[]>(
           `SELECT * FROM livestreams WHERE user_id = ?`,
           [user.id],
         )
         .catch(throwErrorWith('failed to get livestreams'))
-
-      for (const livestream of livestreams) {
-        const [livecomments] = await conn
-          .query<(LivecommentsModel & RowDataPacket)[]>(
-            `SELECT * FROM livecomments WHERE livestream_id = ?`,
-            [livestream.id],
-          )
-          .catch(throwErrorWith('failed to get livecomments'))
-
-        for (const livecomment of livecomments) {
-          totalTip += livecomment.tip
-          totalLivecomments++
-        }
-      }
 
       // 合計視聴者数
       let viewersCount = 0
