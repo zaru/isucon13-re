@@ -1001,3 +1001,33 @@ VALUES
 	(230, 4225, '次のトーナメント、応援しています！', UNIX_TIMESTAMP()),
 	(31, 7023, 'おめでとう！素敵な1年になりますように。', UNIX_TIMESTAMP()),
 	(686, 5680, 'こんにちは', UNIX_TIMESTAMP());
+
+
+
+UPDATE users
+    INNER JOIN (SELECT livestreams.user_id, COUNT(*) AS num
+                FROM reactions
+                         INNER JOIN livestreams ON livestreams.id = reactions.livestream_id
+                GROUP BY livestreams.user_id) AS agg ON agg.user_id = users.id
+SET users.total_reactions = agg.num, users.score = agg.num;
+
+UPDATE users
+    INNER JOIN (SELECT livestreams.user_id, COUNT(*) AS num
+                FROM livecomments
+                         INNER JOIN livestreams ON livestreams.id = livecomments.livestream_id
+                GROUP BY livestreams.user_id) AS agg ON agg.user_id = users.id
+SET users.total_livecomments = agg.num;
+
+UPDATE users
+    INNER JOIN (SELECT livestreams.user_id, IFNULL(SUM(livecomments.tip), 0) AS num
+                FROM livecomments
+                         INNER JOIN livestreams ON livestreams.id = livecomments.livestream_id
+                GROUP BY livestreams.user_id) AS agg ON agg.user_id = users.id
+SET users.total_tip = agg.num;
+
+UPDATE users
+    INNER JOIN (SELECT livestreams.user_id, COUNT(*) AS num
+                FROM livestream_viewers_history
+                         INNER JOIN livestreams ON livestreams.id = livestream_viewers_history.livestream_id
+                GROUP BY livestreams.user_id) AS agg ON agg.user_id = users.id
+SET users.viewers_count = agg.num;

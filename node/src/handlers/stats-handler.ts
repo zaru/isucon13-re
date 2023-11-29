@@ -36,56 +36,23 @@ export const getUserStatisticsHandler = [
       }
 
       // ランク算出
-      const [users] = await conn
-        .query<(UserModel & RowDataPacket)[]>('SELECT * FROM users')
-        .catch(throwErrorWith('failed to get users'))
-
-      const ranking: { username: string; score: number }[] = []
-      for (const user of users) {
-        const [[{ 'COUNT(*)': reaction }]] = await conn
-          .query<({ 'COUNT(*)': number } & RowDataPacket)[]>(
-            `
-              SELECT COUNT(*) FROM users u
-              INNER JOIN livestreams l ON l.user_id = u.id
-              INNER JOIN reactions r ON r.livestream_id = l.id
-              WHERE u.id = ?
-            `,
-            [user.id],
-          )
-          .catch(throwErrorWith('failed to count reactions'))
-
-        const [[{ 'IFNULL(SUM(l2.tip), 0)': tips }]] = await conn
-          .query<
-            ({ 'IFNULL(SUM(l2.tip), 0)': string | number } & RowDataPacket)[]
-          >(
-            `
-              SELECT IFNULL(SUM(l2.tip), 0) FROM users u
-              INNER JOIN livestreams l ON l.user_id = u.id	
-              INNER JOIN livecomments l2 ON l2.livestream_id = l.id
-              WHERE u.id = ?
-            `,
-            [user.id],
-          )
-          .catch(throwErrorWith('failed to count tips'))
-
-        ranking.push({
-          username: user.name,
-          score: reaction + Number(tips),
-        })
-      }
-
-      ranking.sort((a, b) => {
-        if (a.score === b.score) return a.username.localeCompare(b.username)
-        return a.score - b.score
-      })
-
-      let rank = 1
-      for (const r of ranking.toReversed()) {
-        if (r.username === username) {
-          break
-        }
-        rank++
-      }
+      const [[{
+        'score_rank': rank,
+      }]] = await conn
+        .query<({
+          'score_rank': number,
+        } & RowDataPacket)[]>(
+          `
+          select score_rank from (
+            SELECT
+              id,
+              RANK() OVER (ORDER BY score DESC, name DESC) AS score_rank
+            FROM users) as users
+            where id = ?
+          `,
+          [user.id],
+        )
+        .catch(throwErrorWith('failed to count reactions'))
 
       // リアクション数、ライブコメント数、チップ合計
       const [[{
