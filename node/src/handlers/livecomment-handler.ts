@@ -151,22 +151,7 @@ export const postLivecommentHandler = [
         .catch(throwErrorWith('failed to get NG words'))
 
       for (const ngword of ngwords) {
-        const [[{ 'COUNT(*)': hitSpam }]] = await conn
-          .query<({ 'COUNT(*)': number } & RowDataPacket)[]>(
-            `
-              SELECT COUNT(*)
-              FROM
-              (SELECT ? AS text) AS texts
-              INNER JOIN
-              (SELECT CONCAT('%', ?, '%')	AS pattern) AS patterns
-              ON texts.text LIKE patterns.pattern;
-            `,
-            [body.comment, ngword.word],
-          )
-          .catch(throwErrorWith('failed to get hitspam'))
-
-        console.info(`[hitSpam=${hitSpam}] comment = ${body.comment}`)
-        if (hitSpam >= 1) {
+        if (body.comment.includes(ngword.word)) {
           await conn.rollback()
           return c.text('このコメントがスパム判定されました', 400)
         }
