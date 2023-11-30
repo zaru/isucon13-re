@@ -213,6 +213,6 @@ app.get(
 // // 課金情報
 app.get('/api/payment', GetPaymentResult)
 
-serve({ ...app, port: 8080 }, (add) =>
+serve({ ...app, port: process.env['ISUCON13_NODE_PORT'] || 8080 }, (add) =>
   console.log(`Listening on http://localhost:${add.port}`),
 )
