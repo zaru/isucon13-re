@@ -2,19 +2,13 @@
   "name": "isupipe",
   "version": "1.0.0",
   "scripts": {
-    "start": "tsx src/main.ts",
+    "start": "bun run src/main.ts",
     "format": "prettier -w src",
     "lint": "eslint --fix src"
   },
   "keywords": [],
-  "overrides": {
-    "hono-sessions": {
-      "hono": "3.10.2"
-    }
-  },
   "dependencies": {
-    "@hono/node-server": "^1.3.0",
-    "bcrypt": "5.1.1",
+    "bcryptjs": "^2.4.3",
     "hono": "3.10.2",
     "hono-sessions": "0.3.3",
     "mysql2": "3.6.5"

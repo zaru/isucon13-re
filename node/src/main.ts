@@ -1,8 +1,6 @@
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { serve } from '@hono/node-server'
-import { hash, compare } from 'bcrypt'
 import { createPool } from 'mysql2/promise'
 import { CookieStore, sessionMiddleware } from 'hono-sessions'
 import { Hono } from 'hono'
@@ -47,6 +45,7 @@ import {
   getIconHandler,
   postIconHandler,
 } from './handlers/user-handler'
+import bcrypt from 'bcryptjs'
 
 let fallbackUserIcon: Readonly<ArrayBuffer>|null = null;
 
@@ -68,9 +67,12 @@ const runtime = {
         }
       })
     }),
-  hashPassword: async (password: string) => hash(password, 4),
-  comparePassword: async (password: string, hash: string) =>
-    compare(password, hash),
+  hashPassword: async (password: string) => bcrypt.hashSync(password, 4),
+  comparePassword: async (password: string, hash: string) => {
+    // Bunビルトインだとbcryptバージョンが異なるので一致しない
+    // return await Bun.password.verify(password, hash)
+    return bcrypt.compareSync(password,hash)
+  },
   fallbackUserIcon: () => {
     if (fallbackUserIcon) {
       return Promise.resolve(fallbackUserIcon);
@@ -213,6 +215,7 @@ app.get(
 // // 課金情報
 app.get('/api/payment', GetPaymentResult)
 
-serve({ ...app, port: process.env['ISUCON13_NODE_PORT'] || 8080 }, (add) =>
-  console.log(`Listening on http://localhost:${add.port}`),
-)
+export default {
+  port: process.env['ISUCON13_NODE_PORT'] || 8080,
+  fetch: app.fetch,
+};
