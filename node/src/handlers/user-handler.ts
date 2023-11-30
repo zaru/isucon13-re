@@ -11,6 +11,7 @@ import { fillUserResponse } from '../utils/fill-user-response'
 import { throwErrorWith } from '../utils/throw-error-with'
 import { IconModel, UserModel } from '../types/models'
 import crypto from 'crypto'
+const fs = require('fs');
 
 
 // GET /api/user/:username/icon
@@ -80,6 +81,7 @@ export const postIconHandler = [
   verifyUserSessionMiddleware,
   async (c: Context<HonoEnvironment, '/api/icon'>) => {
     const userId = c.get('session').get(defaultUserIDKey) as number // userId is verified by verifyUserSessionMiddleware
+    const userName = c.get('session').get(defaultUserNameKey) as number // userId is verified by verifyUserSessionMiddleware
 
     // base64 encoded image
     const body = await c.req.json<{ image: string }>()
@@ -88,16 +90,24 @@ export const postIconHandler = [
     await conn.beginTransaction()
 
     try {
+      const buffer = Buffer.from(body.image, 'base64');
+      fs.writeFile(`/home/isucon/webapp/public/images/${userName}.jpg`, buffer, (err) => {
+        if (err) {
+          console.error('エラーが発生しました:', err);
+        } else {
+          console.log('ファイルが正常に保存されました。');
+        }
+      });
+
       await conn
         .execute('DELETE FROM icons WHERE user_id = ?', [userId])
         .catch(throwErrorWith('failed to delete old user icon'))
 
-      const buffer = Buffer.from(body.image, 'base64');
       const hash = crypto.createHash('sha256').update(buffer).digest('hex');
       const [{ insertId: iconId }] = await conn
         .query<ResultSetHeader>(
-          'INSERT INTO icons (user_id, image, image_hash) VALUES (?, ?, ?)',
-          [userId, buffer, hash],
+          'INSERT INTO icons (user_id, image, image_hash) VALUES (?, "", ?)',
+          [userId, hash],
         )
         .catch(throwErrorWith('failed to insert icon'))
 

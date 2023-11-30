@@ -70,4 +70,6 @@ mysql -u"$ISUCON_DB_USER" \
 
 bash ../pdns/init_zone.sh 
 
+find /home/isucon/webapp/public/images -type f ! -name 'NoImage.jpg' -delete
+
 
