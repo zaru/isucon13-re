@@ -146,7 +146,7 @@ export const postReactionHandler = [
     const body = await c.req.json<{ emoji_name: string }>()
 
     const conn = await c.get('pool').getConnection()
-    await conn.beginTransaction()
+    // await conn.beginTransaction()
 
     try {
       const now = Date.now()
@@ -182,7 +182,7 @@ export const postReactionHandler = [
         c.get('runtime').fallbackUserIcon,
       ).catch(throwErrorWith('failed to fill reaction'))
 
-      await conn.commit().catch(throwErrorWith('failed to commit'))
+      // await conn.commit().catch(throwErrorWith('failed to commit'))
 
       return c.json(reactionResponse, 201)
     } catch (error) {
