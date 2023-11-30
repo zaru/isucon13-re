@@ -49,7 +49,7 @@ export const fillLivestreamResponse = async (
     id: livestream.id,
     owner: userResponse,
     title: livestream.title,
-    tags: tags.map((tag) => ({ id: tag.id, name: tag.name })),
+    tags: tags,
     description: livestream.description,
     playlist_url: livestream.playlist_url,
     thumbnail_url: livestream.thumbnail_url,
