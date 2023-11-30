@@ -57,7 +57,7 @@ export const reserveLivestreamHandler = [
       // NOTE: 並列な予約のoverbooking防止にFOR UPDATEが必要
       const [slots] = await conn
         .query<(ReservationSlotsModel & RowDataPacket)[]>(
-          'SELECT * FROM reservation_slots WHERE start_at >= ? AND end_at <= ? FOR UPDATE',
+          'SELECT slot FROM reservation_slots WHERE start_at = ? AND end_at = ? FOR UPDATE',
           [body.start_at, body.end_at],
         )
         .catch((error) => {
@@ -66,17 +66,7 @@ export const reserveLivestreamHandler = [
         })
 
       for (const slot of slots) {
-        const [[count]] = await conn
-          .query<(Pick<ReservationSlotsModel, 'slot'> & RowDataPacket)[]>(
-            'SELECT slot FROM reservation_slots WHERE start_at = ? AND end_at = ?',
-            [slot.start_at, slot.end_at],
-          )
-          .catch(throwErrorWith('failed to get reservation_slots'))
-
-        console.info(
-          `${slot.start_at} ~ ${slot.end_at} 予約枠の残数 = ${count.slot}`,
-        )
-        if (count.slot < 1) {
+        if (slot.slot < 1) {
           return c.text(
             `予約期間 ${Math.floor(termStartAt / 1000)} ~ ${Math.floor(
               termEndAt / 1000,
@@ -90,7 +80,7 @@ export const reserveLivestreamHandler = [
 
       await conn
         .query(
-          'UPDATE reservation_slots SET slot = slot - 1 WHERE start_at >= ? AND end_at <= ?',
+          'UPDATE reservation_slots SET slot = slot - 1 WHERE start_at = ? AND end_at = ?',
           [body.start_at, body.end_at],
         )
         .catch(throwErrorWith('failed to update reservation_slot'))
@@ -110,11 +100,15 @@ export const reserveLivestreamHandler = [
         .catch(throwErrorWith('failed to insert livestream'))
 
       // タグ追加
-      for (const tagId of body.tags) {
+      if (body.tags.length > 0) {
+        const tagValues = body.tags.map((tag) => {
+          return [livestreamId, tag];
+        });
+
         await conn
-          .execute(
-            'INSERT INTO livestream_tags (livestream_id, tag_id) VALUES (?, ?)',
-            [livestreamId, tagId],
+          .query(
+            'INSERT INTO livestream_tags (livestream_id, tag_id) VALUES ?',
+            [tagValues],
           )
           .catch(throwErrorWith('failed to insert livestream tag'))
       }
