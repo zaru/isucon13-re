@@ -230,17 +230,11 @@ export const postLivecommentHandler = [
 
       await conn
         .query<ResultSetHeader>(
-          'update users set total_livecomments = total_livecomments + 1 where id = (select user_id from livestreams where id = ?)',
-          [livestreamId],
-        )
-        .catch(throwErrorWith('failed to insert reaction'))
-      
-      await conn
-        .query<ResultSetHeader>(
-          'update users set total_tip = total_tip + ?, score = score + ? where id = (select user_id from livestreams where id = ?)',
+          'update users set total_livecomments = total_livecomments + 1, total_tip = total_tip + ?, score = score + ? where id = (select user_id from livestreams where id = ?)',
           [body.tip, body.tip, livestreamId],
         )
         .catch(throwErrorWith('failed to insert reaction'))
+      
 // TOOD: 500error deadlockがでるのでざつにトランザクションを外している。いちおう今のところは問題ないが…
       await conn
         .query<ResultSetHeader>(
