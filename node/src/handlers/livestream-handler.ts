@@ -107,20 +107,6 @@ export const reserveLivestreamHandler = [
         )
         .catch(throwErrorWith('failed to insert livestream'))
 
-      // タグ追加
-      if (body.tags.length > 0) {
-        const tagValues = body.tags.map((tag) => {
-          return [livestreamId, tag];
-        });
-
-        await conn
-          .query(
-            'INSERT INTO livestream_tags (livestream_id, tag_id) VALUES ?',
-            [tagValues],
-          )
-          .catch(throwErrorWith('failed to insert livestream tag'))
-      }
-
       const response = await fillLivestreamResponse(
         conn,
         {
@@ -189,14 +175,6 @@ export const searchLivestreamsHandler = async (
     if (keyTagName) {
       // タグによる取得
       const tagIds = [tagMaster().findIndex(tag => tag === keyTagName) + 1];
-      const [livestreamTags] = await conn
-        .query<(LivestreamTagsModel & RowDataPacket)[]>(
-          'SELECT * FROM livestream_tags WHERE tag_id IN (?) ORDER BY livestream_id DESC',
-          [tagIds],
-        )
-        .catch(throwErrorWith('failed to get keyTaggedLivestreams'))
-
-      const livestreamIds = livestreamTags.map(tag => tag.livestream_id);
       const [results] = await conn
         .query<(LivestreamRelModel & RowDataPacket)[]>(
           `
@@ -218,10 +196,10 @@ export const searchLivestreamsHandler = async (
               users.image_hash as user_image_hash
           from livestreams
           inner join users ON livestreams.user_id = users.id
-          where livestreams.id in (?)
+          where ? MEMBER OF (tags->'$[*].id')
           ORDER BY livestreams.id DESC
           `,
-          [livestreamIds],
+          [tagIds[0]],
         )
         .catch(throwErrorWith('failed to get livestreams'))
       livestreams.push(...results)
