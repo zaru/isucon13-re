@@ -542,24 +542,112 @@ export const getLivecommentReportsHandler = [
         )
         .catch(throwErrorWith('failed to get livestream'))
 
+      const livestreamResponse = await fillLivestreamResponse(
+        conn,
+        livestream,
+        c.get('runtime').fallbackUserIcon,
+      )
+
       if (livestream.user_id !== userId) {
         return c.text("can't get other streamer's livecomment reports", 403)
       }
 
+      interface LivecommentReportsRelModel {
+        id: number,
+        created_at: number,
+
+        reporter_id: number
+        reporter_name: string
+        reporter_display_name: string
+        reporter_description: string
+        reporter_dark_mode: string
+        reporter_image_hash: string
+
+        comment_user_id: number
+        comment_user_name: string
+        comment_user_display_name: string
+        comment_user_description: string
+        comment_user_dark_mode: string
+        comment_user_image_hash: string
+
+        livecomment_id: number
+        livecomment_comment: string
+        livecomment_tip: number
+        livecomment_created_at: number
+      }
+      
+
       const [livecommentReports] = await conn
-        .query<(LivecommentReportsModel & RowDataPacket)[]>(
-          'SELECT * FROM livecomment_reports WHERE livestream_id = ?',
+        .query<(LivecommentReportsRelModel & RowDataPacket)[]>(
+          `
+          select
+              livecomment_reports.id,
+              livecomment_reports.created_at,
+
+              reporter.name as reporter_name,
+              reporter.display_name as reporter_display_name,
+              reporter.description as reporter_description,
+              reporter.dark_mode as reporter_dark_mode,
+              reporter.image_hash as reporter_image_hash,
+              
+              comment_user.name as comment_user_name,
+              comment_user.display_name as comment_user_display_name,
+              comment_user.description as comment_user_description,
+              comment_user.dark_mode as comment_user_dark_mode,
+              comment_user.image_hash as comment_user_image_hash,
+
+              livecomments.id as livecomment_id,
+              livecomments.comment as livecomment_comment,
+              livecomments.tip as livecomment_tip,
+              livecomments.created_at as livecomment_created_at
+          from livecomment_reports
+          INNER join users as reporter ON reporter.id = livecomment_reports.user_id
+          INNER join livecomments ON livecomments.id = livecomment_reports.livecomment_id
+          INNER join users as comment_user ON comment_user.id = livecomments.user_id
+          where livecomment_reports.livestream_id = ?
+          `,
           [livestreamId],
         )
         .catch(throwErrorWith('failed to get livecomment reports'))
 
       const reportResponses: LivecommentReportResponse[] = []
       for (const livecommentReport of livecommentReports) {
-        const report = await fillLivecommentReportResponse(
-          conn,
-          livecommentReport,
-          c.get('runtime').fallbackUserIcon,
-        ).catch(throwErrorWith('failed to fill livecomment report'))
+        const reporterResponse = {
+          id: livecommentReport.reporter_id,
+          name: livecommentReport.reporter_name,
+          display_name: livecommentReport.reporter_display_name,
+          description: livecommentReport.reporter_description,
+          theme: {
+            id: livecommentReport.reporter_id,
+            dark_mode: !!livecommentReport.reporter_dark_mode,
+          },
+          icon_hash: livecommentReport.reporter_image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
+        };
+        const commentUserResponse = {
+          id: livecommentReport.comment_user_id,
+          name: livecommentReport.comment_user_name,
+          display_name: livecommentReport.comment_user_display_name,
+          description: livecommentReport.comment_user_description,
+          theme: {
+            id: livecommentReport.comment_user_id,
+            dark_mode: !!livecommentReport.comment_user_dark_mode,
+          },
+          icon_hash: livecommentReport.comment_user_image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
+        };
+        const livecommentResponse = {
+          id: livecommentReport.livecomment_id,
+          user: commentUserResponse,
+          livestream: livestreamResponse,
+          comment: livecommentReport.livecomment_comment,
+          tip: livecommentReport.livecomment_tip,
+          created_at: livecommentReport.livecomment_created_at,
+        }
+        const report = {
+          id: livecommentReport.id,
+          reporter: reporterResponse,
+          livecomment: livecommentResponse,
+          created_at: livecommentReport.created_at,
+        }
         reportResponses.push(report)
       }
 
