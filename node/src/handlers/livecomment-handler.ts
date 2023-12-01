@@ -277,8 +277,8 @@ export const postLivecommentHandler = [
 
       await conn
         .query<ResultSetHeader>(
-          'update users set total_livecomments = total_livecomments + 1, total_tip = total_tip + ?, score = score + ? where id = (select user_id from livestreams where id = ?)',
-          [body.tip, body.tip, livestreamId],
+          'update users set total_livecomments = total_livecomments + 1, total_tip = total_tip + ?, score = score + ? where id = ?',
+          [body.tip, body.tip, livestream.user_id],
         )
         .catch(throwErrorWith('failed to insert reaction'))
       
