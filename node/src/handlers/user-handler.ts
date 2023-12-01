@@ -92,6 +92,9 @@ export const postIconHandler = [
 
     try {
       const buffer = Buffer.from(body.image, 'base64');
+
+      const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+
       fs.writeFile(`/home/isucon/webapp/public/images/${userName}.jpg`, buffer, (err) => {
         if (err) {
           console.error('エラーが発生しました:', err);
@@ -99,8 +102,14 @@ export const postIconHandler = [
           console.log('ファイルが正常に保存されました。');
         }
       });
+      fs.writeFile(`/home/isucon/webapp/public/images/"${hash}".jpg`, buffer, (err) => {
+        if (err) {
+          console.error('エラーが発生しました:', err);
+        } else {
+          console.log('ファイルが正常に保存されました。');
+        }
+      });
 
-      const hash = crypto.createHash('sha256').update(buffer).digest('hex');
       const [{ insertId: iconId }] = await conn
         .query<ResultSetHeader>(
           'update users set image_hash = ? where id = ?',
