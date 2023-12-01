@@ -35,9 +35,7 @@ export const getReactionsHandler = [
       user_name: string
       user_display_name: string
       user_description: string
-
-      icon_id?: number
-      icon_image_hash?: string
+      user_image_hash: string
     }
 
     const conn = await c.get('pool').getConnection()
@@ -68,12 +66,9 @@ export const getReactionsHandler = [
         users.display_name as user_display_name,
         users.description as user_description,
         users.dark_mode as user_dark_mode,
-        
-        icons.id as icon_id,
-        icons.image_hash as icon_image_hash
+        users.image_hash as user_image_hash
         FROM reactions
           inner join users on users.id = reactions.user_id
-          left outer join icons on users.id = icons.user_id
           WHERE reactions.livestream_id = ? ORDER BY reactions.created_at DESC`
       const limit = c.req.query('limit')
       if (limit) {
@@ -99,7 +94,7 @@ export const getReactionsHandler = [
             id: reaction.user_id,
             dark_mode: !!reaction.user_dark_mode,
           },
-          icon_hash: reaction.icon_image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
+          icon_hash: reaction.user_image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
         };
         const reactionResponse = {
           id: reaction.id,

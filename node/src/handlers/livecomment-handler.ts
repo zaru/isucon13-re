@@ -40,7 +40,8 @@ export const getLivecommentsHandler = [
       user_name: string
       user_display_name: string
       user_description: string
-      user_description: string
+      user_dark_mode: string
+      user_image_hash: string
       
       icon_id?: number
       icon_image_hash?: string
@@ -76,12 +77,10 @@ export const getLivecommentsHandler = [
           users.display_name as user_display_name,
           users.description as user_description,
           users.dark_mode as user_dark_mode,
-          
-          icons.id as icon_id,
-          icons.image_hash as icon_image_hash
+          users.image_hash as user_image_hash
+        
         from livecomments
         inner join users on livecomments.user_id = users.id
-        left outer join icons on users.id = icons.user_id
         WHERE livecomments.livestream_id = ? ORDER BY livecomments.created_at DESC
         `
       const limit = c.req.query('limit')
@@ -107,7 +106,7 @@ export const getLivecommentsHandler = [
             id: livecomment.user_id,
             dark_mode: !!livecomment.user_dark_mode,
           },
-          icon_hash: livecomment.icon_image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
+          icon_hash: livecomment.user_image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
         };
         const livecommentResponse = {
           id: livecomment.id,

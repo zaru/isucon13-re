@@ -99,21 +99,17 @@ export const postIconHandler = [
         }
       });
 
-      await conn
-        .execute('DELETE FROM icons WHERE user_id = ?', [userId])
-        .catch(throwErrorWith('failed to delete old user icon'))
-
       const hash = crypto.createHash('sha256').update(buffer).digest('hex');
       const [{ insertId: iconId }] = await conn
         .query<ResultSetHeader>(
-          'INSERT INTO icons (user_id, image, image_hash) VALUES (?, "", ?)',
-          [userId, hash],
+          'update users set image_hash = ? where id = ?',
+          [hash, userId],
         )
         .catch(throwErrorWith('failed to insert icon'))
 
       await conn.commit().catch(throwErrorWith('failed to commit'))
 
-      return c.json({ id: iconId }, 201)
+      return c.json({ id: userId }, 201)
     } catch (error) {
       await conn.rollback()
       return c.text(`Internal Server Error\n${error}`, 500)
