@@ -351,13 +351,30 @@ export const getUserLivestreamsHandler = [
         )
         .catch(throwErrorWith('failed to get livestreams'))
 
+      const userResponse = {
+        id: user.id,
+        name: user.name,
+        display_name: user.display_name,
+        description: user.description,
+        theme: {
+          id: user.id,
+          dark_mode: !!user.dark_mode,
+        },
+        icon_hash: user.image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
+      };
       const livestreamResponses: LivestreamResponse[] = []
       for (const livestream of livestreams) {
-        const livestreamResponse = await fillLivestreamResponse(
-          conn,
-          livestream,
-          c.get('runtime').fallbackUserIcon,
-        ).catch(throwErrorWith('failed to fill livestream'))
+        const livestreamResponse =  {
+          id: livestream.id,
+          owner: userResponse,
+          title: livestream.title,
+          tags: livestream.tags || [],
+          description: livestream.description,
+          playlist_url: livestream.playlist_url,
+          thumbnail_url: livestream.thumbnail_url,
+          start_at: livestream.start_at,
+          end_at: livestream.end_at,
+        }
 
         livestreamResponses.push(livestreamResponse)
       }
