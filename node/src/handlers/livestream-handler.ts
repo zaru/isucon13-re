@@ -163,16 +163,14 @@ export const searchLivestreamsHandler = async (
         )
         .catch(throwErrorWith('failed to get keyTaggedLivestreams'))
 
-      for (const livestreamTag of livestreamTags) {
-        const [[livestream]] = await conn
-          .query<(LivestreamsModel & RowDataPacket)[]>(
-            'SELECT * FROM livestreams WHERE id = ?',
-            [livestreamTag.livestream_id],
-          )
-          .catch(throwErrorWith('failed to get livestreams'))
-
-        livestreams.push(livestream)
-      }
+      const livestreamIds = livestreamTags.map(tag => tag.livestream_id);
+      const [results] = await conn
+        .query<(LivestreamsModel & RowDataPacket)[]>(
+          'SELECT * FROM livestreams WHERE id in (?) ORDER BY id DESC',
+          [livestreamIds],
+        )
+        .catch(throwErrorWith('failed to get livestreams'))
+      livestreams.push(...results)
     } else {
       // 検索条件なし
       let query = `SELECT * FROM livestreams ORDER BY id DESC`
