@@ -78,6 +78,13 @@ export const reserveLivestreamHandler = [
         }
       }
 
+      let tagsJson = [];
+      if (body.tags.length > 0) {
+        tagsJson = body.tags.map((tagId) => {
+          return {id: tagId, name: tagMaster()[tagId - 1]};
+        });
+      }
+
       await conn
         .query(
           'UPDATE reservation_slots SET slot = slot - 1 WHERE start_at = ? AND end_at = ?',
@@ -86,7 +93,7 @@ export const reserveLivestreamHandler = [
         .catch(throwErrorWith('failed to update reservation_slot'))
       const [{ insertId: livestreamId }] = await conn
         .query<ResultSetHeader>(
-          'INSERT INTO livestreams (user_id, title, description, playlist_url, thumbnail_url, start_at, end_at) VALUES(?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO livestreams (user_id, title, description, playlist_url, thumbnail_url, start_at, end_at, tags) VALUES(?, ?, ?, ?, ?, ?, ?, ?)',
           [
             userId,
             body.title,
@@ -95,6 +102,7 @@ export const reserveLivestreamHandler = [
             body.thumbnail_url,
             body.start_at,
             body.end_at,
+            JSON.stringify(tagsJson),
           ],
         )
         .catch(throwErrorWith('failed to insert livestream'))
@@ -124,6 +132,7 @@ export const reserveLivestreamHandler = [
           thumbnail_url: body.thumbnail_url,
           start_at: body.start_at,
           end_at: body.end_at,
+          tags: tagsJson,
         },
         c.get('runtime').fallbackUserIcon,
       ).catch(throwErrorWith('failed to fill livestream'))
@@ -153,6 +162,30 @@ export const searchLivestreamsHandler = async (
   try {
     const livestreams: (LivestreamsModel & RowDataPacket)[] = []
 
+    interface LivestreamRelModel {
+      id: number
+      title: string
+      description: string
+      playlist_url: string
+      thumbnail_url: string
+      start_at: number
+      end_at: number
+      tags: {
+        id: number,
+        name: string
+      }[]
+
+      user_id: number
+      user_name: string
+      user_display_name: string
+      user_description: string
+      user_dark_mode: string
+      user_image_hash: string
+      
+      icon_id?: number
+      icon_image_hash?: string
+    }
+
     if (keyTagName) {
       // タグによる取得
       const tagIds = [tagMaster().findIndex(tag => tag === keyTagName) + 1];
@@ -165,15 +198,56 @@ export const searchLivestreamsHandler = async (
 
       const livestreamIds = livestreamTags.map(tag => tag.livestream_id);
       const [results] = await conn
-        .query<(LivestreamsModel & RowDataPacket)[]>(
-          'SELECT * FROM livestreams WHERE id in (?) ORDER BY id DESC',
+        .query<(LivestreamRelModel & RowDataPacket)[]>(
+          `
+          select
+              livestreams.id,
+              livestreams.title,
+              livestreams.description,
+              livestreams.playlist_url,
+              livestreams.thumbnail_url,
+              livestreams.start_at,
+              livestreams.end_at,
+              livestreams.tags,
+
+              users.id as user_id,
+              users.name as user_name,
+              users.display_name as user_display_name,
+              users.description as user_description,
+              users.dark_mode as user_dark_mode,
+              users.image_hash as user_image_hash
+          from livestreams
+          inner join users ON livestreams.user_id = users.id
+          where livestreams.id in (?)
+          ORDER BY livestreams.id DESC
+          `,
           [livestreamIds],
         )
         .catch(throwErrorWith('failed to get livestreams'))
       livestreams.push(...results)
     } else {
       // 検索条件なし
-      let query = `SELECT * FROM livestreams ORDER BY id DESC`
+      let query = `
+      select
+          livestreams.id,
+          livestreams.title,
+          livestreams.description,
+          livestreams.playlist_url,
+          livestreams.thumbnail_url,
+          livestreams.start_at,
+          livestreams.end_at,
+          livestreams.tags,
+
+          users.id as user_id,
+          users.name as user_name,
+          users.display_name as user_display_name,
+          users.description as user_description,
+          users.dark_mode as user_dark_mode,
+          users.image_hash as user_image_hash
+      from livestreams
+      inner join users ON livestreams.user_id = users.id
+      ORDER BY livestreams.id DESC
+      `;
       const limit = c.req.query('limit')
       if (limit) {
         const limitNumber = atoi(limit)
@@ -184,7 +258,7 @@ export const searchLivestreamsHandler = async (
       }
 
       const [results] = await conn
-        .query<(LivestreamsModel & RowDataPacket)[]>(query)
+        .query<(LivestreamRelModel & RowDataPacket)[]>(query)
         .catch(throwErrorWith('failed to get livestreams'))
 
       livestreams.push(...results)
@@ -192,11 +266,29 @@ export const searchLivestreamsHandler = async (
 
     const livestreamResponses: LivestreamResponse[] = []
     for (const livestream of livestreams) {
-      const livestreamResponse = await fillLivestreamResponse(
-        conn,
-        livestream,
-        c.get('runtime').fallbackUserIcon,
-      ).catch(throwErrorWith('failed to fill livestream'))
+      const userResponse = {
+        id: livestream.user_id,
+        name: livestream.user_name,
+        display_name: livestream.user_display_name,
+        description: livestream.user_description,
+        theme: {
+          id: livestream.user_id,
+          dark_mode: !!livestream.user_dark_mode,
+        },
+        icon_hash: livestream.user_image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
+      };
+
+      const livestreamResponse = {
+        id: livestream.id,
+        owner: userResponse,
+        title: livestream.title,
+        tags: livestream.tags || [],
+        description: livestream.description,
+        playlist_url: livestream.playlist_url,
+        thumbnail_url: livestream.thumbnail_url,
+        start_at: livestream.start_at,
+        end_at: livestream.end_at,
+      }
       livestreamResponses.push(livestreamResponse)
     }
 

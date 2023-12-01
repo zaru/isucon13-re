@@ -30,6 +30,10 @@ export interface LivestreamsModel {
   thumbnail_url: string
   start_at: number
   end_at: number
+  tags: {
+    id: number,
+    name: string
+  }[]
 }
 
 export interface ReservationSlotsModel {

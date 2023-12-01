@@ -1,12 +1,9 @@
 import { PoolConnection, RowDataPacket } from 'mysql2/promise'
 import {
-  LivestreamTagsModel,
   LivestreamsModel,
-  TagsModel,
   UserModel,
 } from '../types/models'
 import { UserResponse, fillUserResponse } from './fill-user-response'
-import { tagMaster } from '../utils/tags'
 
 export interface LivestreamResponse {
   id: number
@@ -33,23 +30,11 @@ export const fillLivestreamResponse = async (
 
   const userResponse = await fillUserResponse(conn, user, getFallbackUserIcon)
 
-  const [livestreamTags] = await conn.query<
-    (LivestreamTagsModel & RowDataPacket)[]
-  >('SELECT * FROM livestream_tags WHERE livestream_id = ?', [livestream.id])
-
-  const tags: TagsModel[] = []
-  for (const livestreamTag of livestreamTags) {
-    tags.push({
-      id: livestreamTag.tag_id,
-      name: tagMaster()[livestreamTag.tag_id - 1]
-    })
-  }
-
   return {
     id: livestream.id,
     owner: userResponse,
     title: livestream.title,
-    tags: tags,
+    tags: livestream.tags || [],
     description: livestream.description,
     playlist_url: livestream.playlist_url,
     thumbnail_url: livestream.thumbnail_url,
