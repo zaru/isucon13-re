@@ -46,6 +46,8 @@ import {
   postIconHandler,
 } from './handlers/user-handler'
 import bcrypt from 'bcryptjs'
+import Redis from 'ioredis'
+import { LivestreamsModel } from './types/models'
 
 let fallbackUserIcon: Readonly<ArrayBuffer>|null = null;
 
@@ -99,6 +101,8 @@ const pool = createPool({
   connectionLimit: 10,
 })
 
+const clientRedis = new Redis();
+
 if (!process.env['ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS']) {
   throw new Error(
     'envionment variable ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS is not set',
@@ -130,6 +134,7 @@ app.use(
 )
 app.use('*', async (c, next) => {
   c.set('pool', pool)
+  c.set('clientRedis', clientRedis)
   c.set('runtime', applicationDeps)
   await next()
 })
@@ -144,6 +149,53 @@ app.use('*', async (c, next) => {
 app.post('/api/initialize', async (c) => {
   try {
     await runtime.exec(['../sql/init.sh'])
+    const conn = await c.get('pool').getConnection()
+    const redis = await c.get('clientRedis')
+    const [users] = await conn.query<(UserModel & RowDataPacket)[]>(
+      'SELECT * FROM users',
+      [],
+    )
+    for (const user of users) {
+      await redis.set(`user-${user.id}`, JSON.stringify({
+        id: user.id,
+        name: user.name,
+        display_name: user.display_name,
+        password: user.password,
+        description: user.description,
+        score: user.score,
+        viewers_count: user.viewers_count,
+        total_reactions: user.total_reactions,
+        total_livecomments: user.total_livecomments,
+        total_tip: user.total_tip,
+        dark_mode: user.dark_mode,
+        image_hash: user.image_hash,
+      }))
+    }
+
+    const [livestreams] = await conn.query<(LivestreamsModel & RowDataPacket)[]>(
+      'SELECT * FROM livestreams',
+      [],
+    )
+    for (const livestream of livestreams) {
+      await redis.set(`livestream-${livestream.id}`, JSON.stringify({
+        id: livestream.id,
+        user_id: livestream.user_id,
+        title: livestream.title,
+        description: livestream.description,
+        playlist_url: livestream.playlist_url,
+        thumbnail_url: livestream.thumbnail_url,
+        start_at: livestream.start_at,
+        end_at: livestream.end_at,
+        score: livestream.score,
+        viewers_count: livestream.viewers_count,
+        total_reactions: livestream.total_reactions,
+        total_reports: livestream.total_reports,
+        max_tip: livestream.max_tip,
+        total_tip: livestream.total_tip,
+        tags: livestream.tags,
+      }))
+    }
+
     return c.json({ language: 'node' })
   } catch (error) {
     console.log('init.sh failed with')

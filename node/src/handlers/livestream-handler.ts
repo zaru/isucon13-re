@@ -39,6 +39,7 @@ export const reserveLivestreamHandler = [
     }>()
 
     const conn = await c.get('pool').getConnection()
+    const redis = await c.get('clientRedis')
     await conn.beginTransaction()
 
     try {
@@ -107,6 +108,25 @@ export const reserveLivestreamHandler = [
         )
         .catch(throwErrorWith('failed to insert livestream'))
 
+      
+      await redis.set(`livestream-${livestreamId}`, JSON.stringify({
+        id: livestreamId,
+        user_id: userId,
+        title: body.title,
+        description: body.description,
+        playlist_url: body.playlist_url,
+        thumbnail_url: body.thumbnail_url,
+        start_at: body.start_at,
+        end_at: body.end_at,
+        score: 0,
+        viewers_count: 0,
+        total_reactions: 0,
+        total_reports: 0,
+        max_tip: 0,
+        total_tip: 0,
+        tags: tagsJson,
+      }))
+
       const response = await fillLivestreamResponse(
         conn,
         {
@@ -121,6 +141,7 @@ export const reserveLivestreamHandler = [
           tags: tagsJson,
         },
         c.get('runtime').fallbackUserIcon,
+        c.get('clientRedis'),
       ).catch(throwErrorWith('failed to fill livestream'))
 
       await conn.commit().catch(throwErrorWith('failed to commit'))
@@ -305,6 +326,7 @@ export const getMyLivestreamsHandler = [
           conn,
           livestream,
           c.get('runtime').fallbackUserIcon,
+          c.get('clientRedis'),
         ).catch(throwErrorWith('failed to fill livestream'))
 
         livestreamResponses.push(livestreamResponse)
@@ -339,7 +361,7 @@ export const getUserLivestreamsHandler = [
           [username],
         )
         .catch(throwErrorWith('failed to get user'))
-
+      
       if (!user) {
         return c.text('user not found', 404)
       }
@@ -504,24 +526,46 @@ export const getLivestreamHandler = [
     }
 
     const conn = await c.get('pool').getConnection()
+    const redis = await c.get('clientRedis')
     await conn.beginTransaction()
 
     try {
-      const [[livestream]] = await conn
-        .query<(LivestreamsModel & RowDataPacket)[]>(
+      let livestream = await redis.get(`livestream-${livestreamId}`);
+      if (!livestream) {
+        const [[livestreamDb]] = await conn.query<(LivestreamsModel & RowDataPacket)[]>(
           'SELECT * FROM livestreams WHERE id = ?',
           [livestreamId],
         )
-        .catch(throwErrorWith('failed to get livestream'))
-
-      if (!livestream) {
-        return c.text('not found livestream that has the given id', 404)
+        if (!livestreamDb) {
+          return c.text('not found livestream that has the given id', 404)
+        }
+        livestream = livestreamDb
+        await redis.set(`livestream-${livestream.id}`, JSON.stringify({
+          id: livestream.id,
+          user_id: livestream.user_id,
+          title: livestream.title,
+          description: livestream.description,
+          playlist_url: livestream.playlist_url,
+          thumbnail_url: livestream.thumbnail_url,
+          start_at: livestream.start_at,
+          end_at: livestream.end_at,
+          score: livestream.score,
+          viewers_count: livestream.viewers_count,
+          total_reactions: livestream.total_reactions,
+          total_reports: livestream.total_reports,
+          max_tip: livestream.max_tip,
+          total_tip: livestream.total_tip,
+          tags: livestream.tags,
+        }))
+      } else {
+        livestream = JSON.parse(livestream)
       }
 
       const livestreamResponse = await fillLivestreamResponse(
         conn,
         livestream,
         c.get('runtime').fallbackUserIcon,
+        c.get('clientRedis'),
       ).catch(throwErrorWith('failed to fill livestream'))
 
       await conn.commit().catch(throwErrorWith('failed to commit'))
@@ -550,19 +594,41 @@ export const getLivecommentReportsHandler = [
     }
 
     const conn = await c.get('pool').getConnection()
+    const redis = await c.get('clientRedis')
     await conn.beginTransaction()
     try {
-      const [[livestream]] = await conn
-        .query<(LivestreamsModel & RowDataPacket)[]>(
+      let livestream = await redis.get(`livestream-${livestreamId}`);
+      if (!livestream) {
+        const [[livestreamDb]] = await conn.query<(LivestreamsModel & RowDataPacket)[]>(
           'SELECT * FROM livestreams WHERE id = ?',
           [livestreamId],
         )
-        .catch(throwErrorWith('failed to get livestream'))
-
+        livestream = livestreamDb
+        await redis.set(`livestream-${livestream.id}`, JSON.stringify({
+          id: livestream.id,
+          user_id: livestream.user_id,
+          title: livestream.title,
+          description: livestream.description,
+          playlist_url: livestream.playlist_url,
+          thumbnail_url: livestream.thumbnail_url,
+          start_at: livestream.start_at,
+          end_at: livestream.end_at,
+          score: livestream.score,
+          viewers_count: livestream.viewers_count,
+          total_reactions: livestream.total_reactions,
+          total_reports: livestream.total_reports,
+          max_tip: livestream.max_tip,
+          total_tip: livestream.total_tip,
+          tags: livestream.tags,
+        }))
+      } else {
+        livestream = JSON.parse(livestream)
+      }
       const livestreamResponse = await fillLivestreamResponse(
         conn,
         livestream,
         c.get('runtime').fallbackUserIcon,
+        redis,
       )
 
       if (livestream.user_id !== userId) {

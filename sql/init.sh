@@ -72,4 +72,4 @@ bash ../pdns/init_zone.sh
 
 find /home/isucon/webapp/public/images -type f ! -name 'NoImage.jpg' -delete
 
-
+redis-cli flushall

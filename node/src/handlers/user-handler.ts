@@ -87,6 +87,7 @@ export const postIconHandler = [
     const body = await c.req.json<{ image: string }>()
 
     const conn = await c.get('pool').getConnection()
+    const redis = c.get('clientRedis');
     await conn.beginTransaction()
 
     try {
@@ -106,6 +107,10 @@ export const postIconHandler = [
           [hash, userId],
         )
         .catch(throwErrorWith('failed to insert icon'))
+
+      const userRedis = JSON.parse(await redis.get(`user-${userId}`))
+      userRedis.image_hash = hash
+      redis.set(`user-${userId}`, JSON.stringify(userRedis))
 
       await conn.commit().catch(throwErrorWith('failed to commit'))
 
@@ -184,6 +189,7 @@ export const registerHandler = async (
     .catch(throwErrorWith('failed to generate hashed password'))
 
   const conn = await c.get('pool').getConnection()
+  const redis = await c.get('clientRedis')
   await conn.beginTransaction()
 
   try {
@@ -193,6 +199,21 @@ export const registerHandler = async (
         [body.name, body.display_name, body.description, hashedPassword, body.theme.dark_mode],
       )
       .catch(throwErrorWith('failed to insert user'))
+
+    await redis.set(`user-${userId}`, JSON.stringify({
+      id: userId,
+      name: body.name,
+      display_name: body.display_name,
+      password: hashedPassword,
+      description: body.description,
+      score: 0,
+      viewers_count: 0,
+      total_reactions: 0,
+      total_livecomments: 0,
+      total_tip: 0,
+      dark_mode: body.dark_mode,
+      image_hash: null,
+    }))
 
     await c
       .get('runtime')

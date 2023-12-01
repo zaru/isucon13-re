@@ -39,19 +39,44 @@ export const getReactionsHandler = [
     }
 
     const conn = await c.get('pool').getConnection()
+    const redis = await c.get('clientRedis')
     await conn.beginTransaction()
 
     try {
-      const [[livestream]] = await conn.query<(LivestreamsModel & RowDataPacket)[]>(
-        'SELECT * FROM livestreams WHERE id = ?',
-        [livestreamId],
-      )
-      if (!livestream) throw new Error(`not found livestream that has the given id`)
+      let livestream = await redis.get(`livestream-${livestreamId}`);
+      if (!livestream) {
+        const [[livestreamDb]] = await conn.query<(LivestreamsModel & RowDataPacket)[]>(
+          'SELECT * FROM livestreams WHERE id = ?',
+          [livestreamId],
+        )
+        if (!livestreamDb) throw new Error(`not found livestream that has the given id`)
+        livestream = livestreamDb
+        await redis.set(`livestream-${livestream.id}`, JSON.stringify({
+          id: livestream.id,
+          user_id: livestream.user_id,
+          title: livestream.title,
+          description: livestream.description,
+          playlist_url: livestream.playlist_url,
+          thumbnail_url: livestream.thumbnail_url,
+          start_at: livestream.start_at,
+          end_at: livestream.end_at,
+          score: livestream.score,
+          viewers_count: livestream.viewers_count,
+          total_reactions: livestream.total_reactions,
+          total_reports: livestream.total_reports,
+          max_tip: livestream.max_tip,
+          total_tip: livestream.total_tip,
+          tags: livestream.tags,
+        }))
+      } else {
+        livestream = JSON.parse(livestream)
+      }
     
       const livestreamResponse = await fillLivestreamResponse(
         conn,
         livestream,
         c.get('runtime').fallbackUserIcon,
+        redis,
       )
 
       let query =
@@ -169,6 +194,7 @@ export const postReactionHandler = [
           created_at: now,
         },
         c.get('runtime').fallbackUserIcon,
+        c.get('clientRedis'),
       ).catch(throwErrorWith('failed to fill reaction'))
 
       // await conn.commit().catch(throwErrorWith('failed to commit'))
