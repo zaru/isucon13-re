@@ -193,18 +193,10 @@ export const registerHandler = async (
   try {
     const [{ insertId: userId }] = await conn
       .execute<ResultSetHeader>(
-        'INSERT INTO users (name, display_name, description, password) VALUES(?, ?, ?, ?)',
-        [body.name, body.display_name, body.description, hashedPassword],
+        'INSERT INTO users (name, display_name, description, password, dark_mode) VALUES(?, ?, ?, ?, ?)',
+        [body.name, body.display_name, body.description, hashedPassword, body.theme.dark_mode],
       )
       .catch(throwErrorWith('failed to insert user'))
-
-    const resThemeInsert = await conn
-      .execute('INSERT INTO themes (user_id, dark_mode) VALUES(?, ?)', [
-        userId,
-        body.theme.dark_mode,
-      ])
-      .catch(throwErrorWith('failed to insert user theme'))
-    const themeId = resThemeInsert[0].insertId;
 
     await c
       .get('runtime')
@@ -225,7 +217,7 @@ export const registerHandler = async (
       display_name: body.display_name,
       description: body.description,
       theme: {
-        id: themeId,
+        id: userId,
         dark_mode: !!body.theme.dark_mode,
       },
       icon_hash: 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',

@@ -40,12 +40,10 @@ export const getLivecommentsHandler = [
       user_name: string
       user_display_name: string
       user_description: string
+      user_description: string
       
       icon_id?: number
       icon_image_hash?: string
-
-      theme_id: number
-      theme_dark_mode: boolean
     }
 
     const conn = await c.get('pool').getConnection()
@@ -77,16 +75,13 @@ export const getLivecommentsHandler = [
           users.name as user_name,
           users.display_name as user_display_name,
           users.description as user_description,
+          users.dark_mode as user_dark_mode,
           
           icons.id as icon_id,
-          icons.image_hash as icon_image_hash,
-
-          themes.id as theme_id,
-          themes.dark_mode as theme_dark_mode
+          icons.image_hash as icon_image_hash
         from livecomments
         inner join users on livecomments.user_id = users.id
         left outer join icons on users.id = icons.user_id
-        inner join themes on users.id = themes.user_id
         WHERE livecomments.livestream_id = ? ORDER BY livecomments.created_at DESC
         `
       const limit = c.req.query('limit')
@@ -109,8 +104,8 @@ export const getLivecommentsHandler = [
           display_name: livecomment.user_display_name,
           description: livecomment.user_description,
           theme: {
-            id: livecomment.theme_id,
-            dark_mode: !!livecomment.theme_dark_mode,
+            id: livecomment.user_id,
+            dark_mode: !!livecomment.user_dark_mode,
           },
           icon_hash: livecomment.icon_image_hash || 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0',
         };

@@ -50,7 +50,7 @@ export const getStreamerThemeHandler = [
     try {
       const [[user]] = await conn
         .execute<(Pick<UserModel, 'id'> & RowDataPacket)[]>(
-          'SELECT id FROM users WHERE name = ?',
+          'SELECT id, dark_mode FROM users WHERE name = ?',
           [username],
         )
         .catch(throwErrorWith('failed to get user'))
@@ -60,18 +60,11 @@ export const getStreamerThemeHandler = [
         return c.text('not found user that has the given username', 404)
       }
 
-      const [[theme]] = await conn
-        .execute<(ThemeModel & RowDataPacket)[]>(
-          'SELECT * FROM themes WHERE user_id = ?',
-          [user.id],
-        )
-        .catch(throwErrorWith('failed to get user theme'))
-
       await conn.commit().catch(throwErrorWith('failed to commit'))
 
       const themeResponse = {
-        id: theme.id,
-        dark_mode: !!theme.dark_mode,
+        id: user.id,
+        dark_mode: !!user.dark_mode,
       }
 
       return c.json(themeResponse)

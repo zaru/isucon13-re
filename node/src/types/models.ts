@@ -4,6 +4,7 @@ export interface UserModel {
   display_name: string
   password: string
   description: string
+  dark_mode: boolean
 }
 
 export interface IconModel {
